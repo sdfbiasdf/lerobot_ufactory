@@ -85,6 +85,10 @@ def make_teleoperator_from_config(config: TeleoperatorConfig) -> Teleoperator:
         from .space_mouse import SpaceMouseTeleop
         
         return SpaceMouseTeleop(config)
+    elif config.type == "ufactory_mock":
+        from .ufactory_mock import UFactoryMockTeleop
+
+        return UFactoryMockTeleop(config)
     else:
         try:
             return cast(Teleoperator, make_device_from_device_class(config))
