@@ -1,85 +1,95 @@
 # For UFACTORY data collection usage
 
+## 1. Install
 Please first install additional dependencies into your environment by running:
-```
-$ pip install -r requirements_extra.txt
-```
-This would install gello and space mouse related modules. Also, make sure you have [`xArm-Python-SDK`](https://github.com/xArm-Developer/xArm-Python-SDK) installed.
+- #### Install librealsense
+    ```bash
+    # https://github.com/realsenseai/librealsense/blob/master/doc/distribution_linux.md
+    # Register the server's public key
+    sudo mkdir -p /etc/apt/keyrings
+    curl -sSf https://librealsense.realsenseai.com/Debian/librealsense.pgp | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
 
-## 1. GELLO for xArm7: 
-By running the command above, `gello_software` package will be installed locally under `./src` folder. To ensure proper configuration of the dummy robot, dynamixel motor offset of each joint on the dummy robot must be confirmed from `gello_get_offset.py` script inside this repository. Please Study the usage of GELLO carefully before continue working with real xArm7. 
+    # Make sure apt HTTPS support is installed: 
+    sudo apt-get install apt-transport-https
 
-**Note**: Gello would also require additional dependencies running its scripts. Consider switching to another `conda env` (like `gello`) with gello offset check.
+    # Add the server to the list of repositories
+    echo "deb [signed-by=/etc/apt/keyrings/librealsense.pgp] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | sudo tee /etc/apt/sources.list.d/librealsense.list
+    sudo apt-get update
 
-To get gello offset (should go through this each time gello is powered on):   
+    # Install the libraries (see section below if upgrading packages):
+    sudo apt-get install librealsense2-dkms
+    sudo apt-get install librealsense2-utils
+    ```
+- #### Install additional python dependencies
+    ```bash
+    # This would install gello and space mouse related modules.
+    $ pip install -r requirements_extra.txt
+    $ pip install -e src/gello/third_party/DynamixelSDK/python
+    # install pyrealsense2
+    $ pip install pyrealsense2
+    # install xarm-python-sdk
+    $ pip install git+https://github.com/xArm-Developer/xArm-Python-SDK.git
+    ```
 
-Setup and power on the gello dummy robot, hold it with a **known real joint configuration** (use [`0, 0, 0, 90, 0, 90, 0`] degrees as example):
+## 2. Dataset Recording
+Please use provided `uf_robot_record.py` script in this directory instead of lerobot_record.py in scripts folder. We have made modifications for space mouse data collection (delta command to absolute command) and enabled using external yaml file as flexible configuration. Check the two `*_record_config.yaml` files in config and specify correct filename executing `uf_robot_record.py`.
 
-```
-$ conda activate gello #(configured according to gello ReadMe installation requirements)
-(gello) $ python gello_get_offset.py --port /dev/ttyUSB0 --start_joints 0 0 0 1.5708 0 1.5708 0 --joint_signs 1 1 1 1 1 1 1
-```
-For example, if corresponding output is:
-```
-Attempting to initialize Dynamixel driver (attempt 1/3)
-Successfully initialized Dynamixel driver on /dev/ttyUSB0
-
-best offsets               :  ['0.000', '3.142', '0.000', '1.571', '6.283', '1.571', '4.712']
-best offsets function of pi: [0*np.pi/2, 2*np.pi/2, 0*np.pi/2, 1*np.pi/2, 4*np.pi/2, 1*np.pi/2, 3*np.pi/2 ]
-gripper open (degrees)        113.618359375
-gripper close (degrees)       71.818359375
-```
-Then you should config `gello_xarm7` (like in the yaml config file) as:
-```
-joint_offset_ints: [0, 2, 0, 1, 4, 1, 3] # according to 'best offsets function of pi'
-gripper_config: [8, 113, 71] # (gripper_id， open, close)
-```
-Then the output result (joint offset and gripper offset) can be set to the `teleoperators/gello_xarm7` configuration. 
-
-
-## 2. Space Mouse:
-
-The space mouse currently is configured as **2D control** (in XY plane) for Push T block task, if you need more freedom, check and edit the interface in `teleoperators/space_mouse/space_mouse.py`.  
-
-## 3. Lerobot Data Recording with above devices:
-Please use provided `record_uf_edit.py` script in this directory instead of lerobot_record.py in scripts folder. We have made modifications for space mouse data collection (delta command to absolute command) and enabled using external yaml file as flexible configuration. Check the two `*_record_config.yaml` files here and specify correct filename executing `record_uf_edit.py`.
-
-## 4. Example commandline instructions:
-
-### 4.1 Dataset Recording:
-
-Recording with gello_xarm7 (modify the config file with your correct OFFSET and PORT name first!):
-
-```shell
-python record_uf_edit.py --config xarm7_gello_record_config.yaml
-
-```
-Recording with xarm7 and space mouse (and **Resume** recording on existing dataset):
-```shell
-python record_uf_edit.py --config xarm7_spacemouse_record_config.yaml --resume
-
-```
 **Keyboard control** for data recording:  
 
 “`->`” Exit early: Finish current episode, save and enter reset process for next episode preparation；  
 "`<-`" rerecord_episode + Exit early: Terminate current recording, reset and then re-record this episode；  
-"`Esc`" stop_recording + Exit early: Save current recording and exit recording process；  
+"`Esc`" stop_recording + Exit early: Exit recording process；
 
-### 4.2 Training
+**Please follow the on-screen instructions**
 
-Use official script for training, here use `diffusion` model and resume training option as example, edit or remove arguments based on your case:
-```shell
-python -m lerobot.scripts.lerobot_train  --dataset.repo_id=ufactory/xarm7_pushT   --policy.type=diffusion   --output_dir=outputs/train/xarm7_pushT   --job_name=xarm7_pushT   --policy.device=cuda --policy.repo_id=ufactory/xarm7_pushT --steps=800000  --resume=true --config_path=<YOUR_LOCAL_PATH>/train/xarm7_pushT/checkpoints/last/pretrained_model/train_config.json --batch_size=16
-```
+- #### Gello
+    ```bash
+    python uf_robot_record.py --config config/xarm7_gello_record_config.yaml
 
-### 4.3 Evaluation
+    # Use the --resume parameter to continue collecting data on an existing dataset.
+    ```
+
+- #### Space Mouse
+    *The space mouse currently is configured as **2D control** (in XY plane) for Push T block task, if you need more freedom, check and edit the interface in `teleoperators/space_mouse/space_mouse.py`.*  
+
+    ```bash
+    python uf_robot_record.py --config config/xarm7_spacemouse_record_config.yaml
+
+    # Use the --resume parameter to continue collecting data on an existing dataset.
+    ```
+
+## 3. Training
+- #### Gello
+    Use official script for training, here use `act` model and resume training option as example, edit or remove arguments based on your case:
+    ```bash
+    python -m lerobot.scripts.lerobot_train  --dataset.repo_id=ufactory/xarm7_record_datas --policy.type=act --output_dir=outputs/train/xarm7_record_datas --job_name=xarm7_record_datas --policy.device=cuda --policy.repo_id=ufactory/xarm7_record_datas
+
+    # Use the --resume parameter to continue training
+    # --resume=true --config_path=<YOUR_LOCAL_PATH>/train/xarm7_pushT/checkpoints/last/pretrained_model/train_config.json
+    ```
+- #### Space Mouse
+    Use official script for training, here use `diffusion` model and resume training option as example, edit or remove arguments based on your case:
+    ```bash
+    python -m lerobot.scripts.lerobot_train  --dataset.repo_id=ufactory/xarm7_pushT --policy.type=diffusion --output_dir=outputs/train/xarm7_pushT --job_name=xarm7_pushT --policy.device=cuda --policy.repo_id=ufactory/xarm7_pushT
+
+    # Use the --resume parameter to continue training
+    # --resume=true --config_path=<YOUR_LOCAL_PATH>/train/xarm7_pushT/checkpoints/last/pretrained_model/train_config.json
+    ```
+
+## 4. Evaluation
 Use official script for trained policy evaluation, for example:
-```shell
-python -m lerobot.scripts.lerobot_eval --policy.path=<YOUR_LOCAL_PATH>/outputs/train/xarm7_pushT/checkpoints/last/pretrained_model/
-```
+- #### Gello
+    ```bash
+    python uf_robot_eval.py --config config/xarm7_gello_record_config.yaml --policy.path=<YOUR_LOCAL_PATH>/outputs/train/xarm7_record_datas/checkpoints/last/pretrained_model/
+    ```
+- #### Space Mouse
+    ```bash
+    python uf_robot_eval.py --config config/xarm7_spacemouse_record_config.yaml --policy.path=<YOUR_LOCAL_PATH>/outputs/train/xarm7_record_datas/checkpoints/last/pretrained_model/
+    ```
 
-### 4.4 Others
+
+## 5. Others
 For other LeRobot supported features like Dataset Visualization or Editting, please go through LeRobot Documentation for instructions.
 
-## 5. Special Notices:
+## 6. Special Notices:
 Users need to **study the whole codebase thoroughly**, and understand about relevant configuration parameters, since the configurations written in the code are not for all use cases and set-ups, it is the users job to study the code or theories to get good knowledge about them and modify/tune on their own. Especially for diffusion policy, default parameters from LeRobot may be targeted for simulation and not optimized for real robot scenarios.
