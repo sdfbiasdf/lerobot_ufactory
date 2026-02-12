@@ -451,7 +451,7 @@ class UFactoryMockTeleop(Teleoperator, threading.Thread):
                 else:
                     pose.append(1.0)  # gripper pos
             else:
-                _, pose = self.arm.get_position(is_radian=True)
+                _, pose = self.arm.get_position_aa(is_radian=True)
                 if self.config.gripper_type > 0:
                     _, grippos = self.arm.get_gripper_position()
                     grippos = min(grippos, self.config.gripper_open)

@@ -1,0 +1,39 @@
+RobotConfig:
+  _target_: lerobot.robots.ufactory_robot.UFRobotConfig
+  id: "lab"
+  robot_ip: "192.168.1.85"
+  robot_dof: 7
+  control_space: "cartesian"
+  gripper_control: True
+  gripper_type: 10
+  # gripper_port: "/dev/ttyUSB1"
+  start_joints: [0, 0, 0, 1.2479, 0, 1.27409, 0]
+  max_linear_velocity: 200
+  rx_continuous: True
+  cameras:
+    fisheye:
+      _target_: lerobot.cameras.opencv.configuration_opencv.OpenCVCameraConfig
+      index_or_path: 7
+      width: 640
+      height: 480
+      fps: 30
+      fourcc: "MJPG"
+
+DatasetRecordConfig:
+  _target_: lerobot.scripts.lerobot_record.DatasetRecordConfig
+  # root of local repo: /home/<user_name>/.cache/huggingface/lerobot (default)
+  repo_id: "ufactory/xarm7_record_datas"
+  single_task: "Pick up the Lego block and drop into the box on the right."
+  fps: 30
+  episode_time_s: 60  # max duration for one episode
+  reset_time_s: 20  # time for resetting env between episodes
+  push_to_hub: False
+
+# make sure to edit with your correct configurations!
+TeleoperatorConfig:
+  _target_: lerobot.teleoperators.pika_xarm.PikaxArmConfig
+  robot_ip: "192.168.1.85"
+  # port: "/dev/ttyUSB0"
+  scale_xyz: 1.5
+  rx_continuous: True
+

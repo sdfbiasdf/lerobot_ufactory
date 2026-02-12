@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import time
+import math
 import numpy as np
 from lerobot.cameras.utils import make_cameras_from_configs
 
@@ -10,10 +11,9 @@ from .config_uf_robot import UFRobotConfig
 from xarm.wrapper import XArmAPI
 from threading import Thread, Event, Lock
 from .uf_report_utils import *
+from lerobot.teleoperators.pika_xarm.pika_device import PikaDevice
 
 ## Configurations:
-MAX_LINEAR_VELOCITY_MM = 200
-MAX_JOINT_VELOCITY_RAD = 1.6
 INIT_SYNC_JOINT_VELOCITY_RAD = 0.2
 
 CARTESIAN_OBS_KEYS = [
@@ -55,6 +55,9 @@ class UFRobot(Robot, Thread):
 
         self._cmd_cnt = 0
 
+        self._max_joint_velocity = math.radians(self.config.max_joint_velocity)
+        self._max_linear_velocity = self.config.max_linear_velocity
+
         self.report_stop_event = Event()
         self._rt_report_normal = False
         self._update_lock = Lock()
@@ -62,6 +65,15 @@ class UFRobot(Robot, Thread):
         self._cart_obs_has_vel = any('velo.' in key for key in CARTESIAN_OBS_KEYS)
         self._jnt_obs_has_vel = self.config.observe_joint_vel
 
+        self._gripper_type = self.config.gripper_type if self.config.gripper_type > 0 else 1 if self.config.gripper_control else 0
+        if self._gripper_type == 10:
+            self.pika_device = PikaDevice(2, pika_gripper_port=self.config.gripper_port)
+            self.pika_gripper = self.pika_device.pika_gripper
+            # from .pika_gripper import PikaGripper
+            # self.pika_gripper = PikaGripper(self.config.gripper_port)
+            import logging
+            logger = logging.getLogger('pika.gripper')
+            logger.setLevel(logging.WARNING)
 
     @property
     def _robot_state_features(self)-> dict:
@@ -125,6 +137,11 @@ class UFRobot(Robot, Thread):
             print("Could not connect to the cameras, check that all cameras are plugged-in.")
             raise ConnectionError()
 
+        if self._gripper_type == 10:
+            if not self.pika_gripper.connect():
+                print('Could not connect to pika gripper.')
+                raise ConnectionError()
+
         self.configure()
         if calibrate:  
             self.calibrate()
@@ -151,15 +168,19 @@ class UFRobot(Robot, Thread):
         if not self._get_arm_err() == 0:
             raise RuntimeError(f"Failed to set correct state to UF robot! Controller Error code: {self._get_arm_err()} !")
 
-        if self.config.gripper_control:
-            self.real_arm.set_gripper_enable(True)
-            self.real_arm.set_gripper_mode(0)
-            self.real_arm.set_gripper_speed(3000)
-            self.real_arm.set_gripper_position(800)
+        if self._gripper_type > 0:
+            if self._gripper_type == 1 or self._gripper_type == 2:
+                self.real_arm.set_gripper_enable(True)
+                self.real_arm.set_gripper_mode(0)
+                self.real_arm.set_gripper_speed(3000)
+                self.real_arm.set_gripper_position(800)
+            elif self._gripper_type == 10:
+                self.pika_gripper.enable()
+                self.pika_gripper.set_gripper_distance(100)
             if not self._get_arm_err() == 0:
                 raise RuntimeError(f"Failed to set correct state to Gripper! Controller Error code: {self._get_arm_err()} !")
         
-        if self._use_rt_report:
+        if self._use_rt_report and not self._rt_report_normal:
             self.start()
         time.sleep(0.2)
 
@@ -203,18 +224,26 @@ class UFRobot(Robot, Thread):
                 # jvel_fbk_list = self.rt_actual_joint_speed.copy()
 
             obs_dict = {"pose.x": pos_list[0],"pose.y": pos_list[1],"pose.z": pos_list[2],"pose.rx": pos_list[3],"pose.ry": pos_list[4],"pose.rz": pos_list[5]}
+            if self.config.rx_continuous and obs_dict["pose.rx"] < 0:
+                obs_dict["pose.rx"] += math.pi * 2
             if self._cart_obs_has_vel:
                 obs_dict.update({"velo.x": vel_list[0], "velo.y": vel_list[1], "velo.z": vel_list[2], "velo.rx": vel_list[3], "velo.ry": vel_list[4], "velo.rz": vel_list[5]})
         else:
             ValueError(f"Please check the given control space of uf_robot! got {self._control_space}")
         
-        if self.config.gripper_control:    
+        if self._gripper_type > 0:
             # TODO: Add gripper pose
-            code, grippos = self.real_arm.get_gripper_position()
+            if self._gripper_type == 10:
+                grippos = self.pika_gripper.get_gripper_distance()
+            else:
+                code, grippos = self.real_arm.get_gripper_position()
 
             self.logs["read_pos_dt_s"] = time.perf_counter() - before_read_t
             # states[1] as joint velo
-            grippos_norm = ( self.GRIPPER_OPEN - grippos ) / (self.GRIPPER_OPEN - self.GRIPPER_CLOSE)
+            if self._gripper_type == 10:
+                grippos_norm = ( 100 - grippos ) / (100 - 0)
+            else:
+                grippos_norm = ( self.GRIPPER_OPEN - grippos ) / (self.GRIPPER_OPEN - self.GRIPPER_CLOSE)
             obs_dict["gripper.pos"] = grippos_norm
 
         # Capture images from cameras
@@ -234,7 +263,7 @@ class UFRobot(Robot, Thread):
         before_write_t = time.perf_counter()
         if self._control_space == "joint":
             # first sync with gello or other control device SLOWLY!
-            jnt_spd = INIT_SYNC_JOINT_VELOCITY_RAD if self._cmd_cnt < 20 else MAX_JOINT_VELOCITY_RAD
+            jnt_spd = INIT_SYNC_JOINT_VELOCITY_RAD if self._cmd_cnt < 20 else self._max_joint_velocity
             wait_ = True if self._cmd_cnt == 0 else False
 
             cmd_list = [0]*(self._dof+1)
@@ -254,21 +283,33 @@ class UFRobot(Robot, Thread):
                 time.sleep(0.1)
 
             self.real_arm.set_servo_angle(angle=cmd_list[:self._dof], speed=jnt_spd, is_radian=True, wait=wait_)
-            gripper_command = self.GRIPPER_OPEN + cmd_list[self._dof] * (self.GRIPPER_CLOSE - self.GRIPPER_OPEN)
+            if self._gripper_type > 0:
+                if self._gripper_type == 10:
+                    gripper_command = 100 + cmd_list[self._dof] * (0 - 100)
+                else:
+                    gripper_command = self.GRIPPER_OPEN + cmd_list[self._dof] * (self.GRIPPER_CLOSE - self.GRIPPER_OPEN)
         elif self._control_space == "cartesian": # unit: mm? 
-            lin_spd = MAX_LINEAR_VELOCITY_MM
+            lin_spd = self._max_linear_velocity
             
             if not self._rt_report_normal:
                 raise ConnectionError("RT Report for target robot NOT READY! ")
             cmd_list = [action["pose.x"], action["pose.y"], action["pose.z"], action["pose.rx"], action["pose.ry"], action["pose.rz"]]
             self.real_arm.set_position_aa(axis_angle_pose=cmd_list, speed=lin_spd, is_radian=True, wait=False)
-            if self.config.gripper_control:
-                gripper_command = self.GRIPPER_OPEN + action["gripper.pos"] * (self.GRIPPER_CLOSE - self.GRIPPER_OPEN)
+            # self.real_arm.set_position(*cmd_list, radius=0, speed=lin_spd, is_radian=True, wait=False)
+            if self._gripper_type > 0:
+                if self._gripper_type == 10:
+                    gripper_command = 100 + action["gripper.pos"] * (0 - 100)
+                else:
+                    gripper_command = self.GRIPPER_OPEN + action["gripper.pos"] * (self.GRIPPER_CLOSE - self.GRIPPER_OPEN)
 
         if self._cmd_cnt < 99999:
             self._cmd_cnt += 1 # CHECK!! possibility of overflow?
-        if self.config.gripper_control:
-            self.real_arm.set_gripper_position(gripper_command, wait=False) # CHECK! the command unit
+        if self._gripper_type > 0:
+            if self._gripper_type == 10:
+                gripper_command = min(max(gripper_command, 0), 100)
+                self.pika_gripper.set_gripper_distance(gripper_command)
+            else:
+                self.real_arm.set_gripper_position(gripper_command, wait=False) # CHECK! the command unit
         self.logs["write_pos_dt_s"] = time.perf_counter() - before_write_t
         return action
 

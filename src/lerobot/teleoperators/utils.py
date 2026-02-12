@@ -81,6 +81,10 @@ def make_teleoperator_from_config(config: TeleoperatorConfig) -> Teleoperator:
         from .gello_xarm import GelloxArm
 
         return GelloxArm(config)
+    elif config.type == "pika_xarm":
+        from .pika_xarm import PikaxArm
+
+        return PikaxArm(config)
     elif config.type == "space_mouse":
         from .space_mouse import SpaceMouseTeleop
         

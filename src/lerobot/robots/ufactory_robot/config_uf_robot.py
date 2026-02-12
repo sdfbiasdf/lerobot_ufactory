@@ -33,5 +33,10 @@ class UFRobotConfig(RobotConfig):
     robot_dof: int | None = None  # Set it correctly if controlling in joint space!
     control_space: str = "joint"
     gripper_control: bool = True
+    gripper_type: int = 1           # 1: xArm Gripper, 10: Pika Gripper
+    gripper_port: str = None   # only used by pika gripper (gripper_type=10)
     observe_joint_vel: bool = False # only effective in joint control mode
     start_joints: Tuple[float, ...] = (0, 0, 0, np.pi/2, 0, np.pi/2, 0)
+    max_joint_velocity: int = 90   # °/s, only effective in joint control mode
+    max_linear_velocity: int = 200 # mm/s, only effective in cartesian control mode
+    rx_continuous: bool = False

@@ -8,6 +8,7 @@ from lerobot.teleoperators import (
     ufactory_mock
 )
 from lerobot.teleoperators.ufactory_mock import UFactoryMockTeleop
+from lerobot.teleoperators.pika_xarm import PikaxArm
 from lerobot.robots import ufactory_robot
 
 
@@ -107,6 +108,11 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
 
     print("\n********** Episode Record Loop Start **********")
 
+    if isinstance(teleop, PikaxArm):
+        input('\nPress Enter to record this episode >>>>> ')
+        time.sleep(1)
+        teleop.set_ctrl_status(True)
+
     with VideoEncodingManager(dataset):
         recorded_episodes = 0
         while recorded_episodes < cfg.dataset.num_episodes and not events["stop_recording"]:
@@ -144,14 +150,27 @@ def record(cfg: RecordConfig) -> LeRobotDataset:
                 log_say("Re-record episode", cfg.play_sounds)
                 events["rerecord_episode"] = False
                 events["exit_early"] = False
+                if isinstance(teleop, PikaxArm):
+                    teleop.set_ctrl_status(False)
                 dataset.clear_episode_buffer()
                 input('\nPress Enter to rerecord this episode >>>>> ')
+
+                if isinstance(teleop, PikaxArm):
+                    robot.configure()
+                    time.sleep(1)
+                    teleop.set_ctrl_status(True)
                 continue
 
             if not events['stop_recording']:
+                if isinstance(teleop, PikaxArm):
+                    teleop.set_ctrl_status(False)
                 dataset.save_episode()
                 recorded_episodes += 1
                 input('Press Enter to record at the next episode >>>>> ')
+                if isinstance(teleop, PikaxArm):
+                    robot.configure()
+                    time.sleep(1)
+                    teleop.set_ctrl_status(True)
 
     print("\n********** Episode Record Loop Exit **********")
 

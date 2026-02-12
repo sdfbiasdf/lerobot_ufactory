@@ -9,7 +9,6 @@ RobotConfig:
 DatasetRecordConfig:
   _target_: lerobot.scripts.lerobot_record.DatasetRecordConfig
   # root of local repo: /home/<user_name>/.cache/huggingface/lerobot (default)
-  # repo_id: "ufactory/xarm7_act_mock_20260126"
   repo_id: "ufactory/xarm7_record_datas"
   single_task: "Pick up the Lego block and drop into the box on the right."
   fps: 30
