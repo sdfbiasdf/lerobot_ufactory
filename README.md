@@ -6,6 +6,7 @@ Please make sure you have properly followed the LeRobot official installation (*
 
 [![watch the video](./src/lerobot/ufactory_usage/assets/inference-gello.png)](https://www.youtube.com/watch?v=wTiWLiHciT8)
 
+[![watch the video](./src/lerobot/ufactory_usage/assets/inference-pika.png)](https://youtu.be/IiyvewZh5OY)
 
 ## Acknowledgement:
 
