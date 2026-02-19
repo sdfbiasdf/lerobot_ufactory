@@ -73,8 +73,6 @@ def instantiate_from_dict(cfg):
         module_path, class_name = cfg["_target_"].rsplit(".", 1)
         cls = getattr(importlib.import_module(module_path), class_name)
         kwargs = {k: v for k, v in cfg.items() if k != "_target_"}
-        pp_dict ={k: instantiate_from_dict(v) for k, v in kwargs.items()} 
-        print(pp_dict)
         return cls(**{k: instantiate_from_dict(v) for k, v in kwargs.items()})
     elif isinstance(cfg, dict):
         return {k: instantiate_from_dict(v) for k, v in cfg.items()}
@@ -131,7 +129,7 @@ def eval(cfg: EvalConfig):
         
 
     policy = make_policy(cfg=cfg.policy, ds_meta=dataset_metadata)
-    # policy.eval()
+    policy.eval()
 
     # The inference device is automatically set to match the detected hardware, overriding any previous device settings from training to ensure compatibility.
     preprocessor_overrides = {
@@ -140,7 +138,7 @@ def eval(cfg: EvalConfig):
     }
 
     preprocessor, postprocessor = make_pre_post_processors(
-        policy_cfgdk=cfg.policy,
+        policy_cfg=cfg.policy,
         pretrained_path=cfg.policy.pretrained_path,
         preprocessor_overrides=preprocessor_overrides,
         dataset_stats=dataset_metadata.stats
@@ -174,16 +172,12 @@ def eval(cfg: EvalConfig):
     sleep_time_s = 1 / dataset_metadata.fps
 
     print("\n********** Policy Eval Episode Loop Start **********")
-    try:
-        robot.configure()
-    except RuntimeError:
-        print("already running")
 
     rx_continuous = getattr(cfg.robot, 'rx_continuous', False)
 
     # with torch.no_grad(), torch.autocast(device_type=device.type) if cfg.policy.use_amp else nullcontext():
     while True:
-        
+        robot.configure()
         policy.reset()
         preprocessor.reset()
         postprocessor.reset()
