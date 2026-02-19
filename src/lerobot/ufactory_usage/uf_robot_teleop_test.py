@@ -3,6 +3,7 @@ import argparse
 import importlib
 import logging
 import time
+import math
 from dataclasses import asdict, dataclass
 from pprint import pformat
 from lerobot.scripts.lerobot_record import register_third_party_plugins
@@ -26,7 +27,8 @@ from lerobot.teleoperators import (  # noqa: F401
     so101_leader,
     gello_xarm,
     space_mouse,
-    ufactory_mock
+    ufactory_mock,
+    pika_xarm
 )
 from lerobot.utils.control_utils import (
     is_headless,
@@ -64,6 +66,12 @@ def instantiate_from_dict(cfg):
 
 def eval(cfg: EvalConfig):
     init_logging()
+
+    if hasattr(cfg.robot, 'rx_continuous'):
+        cfg.robot.rx_continuous = False
+    if hasattr(cfg.teleop, 'rx_continuous'):
+        cfg.teleop.rx_continuous = False
+
     logging.info(pformat(asdict(cfg)))
 
     robot = make_robot_from_config(cfg.robot)
@@ -113,6 +121,8 @@ def eval(cfg: EvalConfig):
         precise_sleep(sleep_time_s - dt_s)
     
     print("\n********** Teleop Control Loop Exit **********")
+    robot.disconnect()
+    teleop.disconnect()
     if not is_headless() and listener is not None:
         listener.stop()
 

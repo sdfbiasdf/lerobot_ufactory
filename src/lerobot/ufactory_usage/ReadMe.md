@@ -1,6 +1,7 @@
 # UFACTORY Data Collection Guide(Imitation Learning)
 
 ## ⚠️ Important Notice
+Using gello to collect dataset:
 - Once data collection starts, **the relative position between the robot arm and the camera (D435/D435i) must not be changed**.  
 - When making the inference, the position of the camera and the collection must be the same. Otherwise, the collected data will become invalid.  
 - In case of change, the entire process must be re-performed:
@@ -8,6 +9,10 @@
 ```
 Collect Dataset → Train the model → Perform Inference and Evaluation
 ```
+
+Using pika to collect dataset:
+- There are no specific requirements for the relative positions of the two pika stations and the robotic arm. However, **the pika needs to be recalibrated after the station moves**.
+- The positions of the pika stations during the collection and inference processes do not have to be the same.
 
 ## 1. Hardware Requirements
 
@@ -20,43 +25,48 @@ Collect Dataset → Train the model → Perform Inference and Evaluation
 - **Camera Mount**: Provided by UFACTORY (purchase or 3D print)
   - Purchase: [UFACTORY Camera Stand](https://www.ufactory.cc/product-page/ufactory-xarm-camera-stand/)
   - 3D Model: [Realsense_Camera_Stand.STEP](https://www.ufactory.cc/wp-content/uploads/2024/05/CameraStand_1300.zip)
-- **Teleoperation Device**: gello
+- **Teleoperation Device**: gello, [pika](https://global.agilex.ai/products/pika)
 
 ---
 
 ## 2. Software Environment Setup
 
-### 2.1 Install librealsense
+### 2.1 Using gello
+
+#### Install librealsense
 
 Reference: [librealsense Linux Installation Guide](https://github.com/realsenseai/librealsense/blob/master/doc/distribution_linux.md)
 
-#### Register Public Key
+##### Register Public Key
 ```bash
 sudo mkdir -p /etc/apt/keyrings
 curl -sSf https://librealsense.realsenseai.com/Debian/librealsense.pgp | sudo tee /etc/apt/keyrings/librealsense.pgp > /dev/null
 ```
 
-#### Install APT HTTPS Support
+##### Install APT HTTPS Support
 ```bash
 sudo apt-get install apt-transport-https
 ```
 
-#### Add the server to the list of repository
+##### Add the server to the list of repository
 ```bash
 echo "deb [signed-by=/etc/apt/keyrings/librealsenseai.gpg] https://librealsense.realsenseai.com/Debian/apt-repo `lsb_release -cs` main" | \
 sudo tee /etc/apt/sources.list.d/librealsense.list
 sudo apt-get update
 ```
 
-#### Install librealsense
+##### Install librealsense
 ```bash
 sudo apt-get install librealsense2-dkms
 sudo apt-get install librealsense2-utils
 ```
+### 2.2 Using pika
+Please refer to [pika tracking device calibration](https://github.com/xArm-Developer/ufactory_teleop/tree/main/pika_teleop).  
+First-time use of Pika Sense or when the base station position changes requires calibration.
 
----
 
-### 2.2 Create Python Virtual Environment
+## 3. Lerobot Environment Setup
+### 3.1 Create Python Virtual Environment
 
 #### Linux (Conda)
 ```bash
@@ -69,9 +79,8 @@ conda activate lerobot
 conda install ffmpeg -c conda-forge
 ```
 
----
 
-### 2.3 Install LeRobot and Dependencies
+### 3.2 Install LeRobot and Dependencies
 
 #### Install LeRobot
 ```bash
@@ -93,9 +102,9 @@ pip install pyrealsense2  # 2.56.5.9235
 pip install git+https://github.com/xArm-Developer/xArm-Python-SDK.git
 ```
 
-## 3. Data Collection
+## 4. Data Collection
 
-### 3.1 Teleoperation Test
+### 4.1 Teleoperation Test
 
 #### Using gello (xArm7)
 1. Modify the configuration file (example: `xarm7_gello_record_config.yaml`)
@@ -105,17 +114,35 @@ pip install git+https://github.com/xArm-Developer/xArm-Python-SDK.git
      - `start_joints`: Initial joint positions
    - **TeleoperatorConfig**
      - `start_joints`: Initial joint positions
-2. Move the gello joints to match the robot's initial pose
+2. Move the gello joints to match the robot's initial pose;
 3. Start the script:
 ```bash
 python uf_robot_teleop_test.py --config config/xarm7_gello_record_config.yaml
 ```
-4. Press **Enter** to begin teleoperation
-5. Press **ESC** to exit
+4. Press **Enter** to begin teleoperation;
+5. Press **ESC** to exit.
 
----
 
-### 3.2 Data Recording
+#### Using pika (xArm7)
+1. Modify the configuration file (example: `xarm7_pika_record_config.yaml`)
+   - **RobotConfig**
+     - `robot_ip`: IP address of the robot
+     - `robot_dof`: Degrees of freedom
+     - `start_joints`: Initial joint positions
+   - **TeleoperatorConfig**
+     - `start_joints`: Initial joint positions
+     - `gripper-port`: Pika gripper serial port
+     - `index_or_path`: Pika gripper camera index
+     - `port`: Pika sense serial port
+2. Move the pika sense to the initial position;
+3. Start the script:
+```bash
+python uf_robot_teleop_test.py --config config/xarm7_pika_record_config.yaml
+```
+1. Double click pika sense to start teleoperation;
+2. Press **ESC** to exit.
+
+### 4.2 Data Recording
 **Users may define their own data collection strategies. LeRobot only enforces the dataset format.**
 
 **Keyboard control** for data recording:  
@@ -134,24 +161,30 @@ python uf_robot_record.py --config config/xarm7_gello_record_config.yaml
 python uf_robot_record.py --config config/xarm7_mock_record_config.yaml
 ```
 
----
-
-### 3.3 Resume Data Recording
+#### Recording with pika(teleoperation)
 ```bash
-# Resume gello-based recording
-python uf_robot_record.py --config config/xarm7_gello_record_config.yaml --resume
+python uf_robot_record.py --config config/xarm7_pika_record_config.yaml
 ```
 
+### 4.3 Resume Data Recording
+
+#### Resume gello-based recording
 ```bash
-# Resume random target recording
+python uf_robot_record.py --config config/xarm7_gello_record_config.yaml --resume
+```
+#### Resume random target recording
+```bash
 python uf_robot_record.py --config config/xarm7_mock_record_config.yaml --resume
 ```
 
----
+#### Resume pika-based recording
+```bash
+python uf_robot_record.py --config config/xarm7_pika_record_config.yaml --resume
+```
 
-## 4. Training
+## 5. Training
 
-### 4.1 Initial Training(Use ACT)
+### 5.1 Initial Training(Use ACT)
 ```bash
 # Note:
 # repo_id must match the value used during data collection
@@ -168,7 +201,7 @@ python -m lerobot.scripts.lerobot_train \
   --steps=800000
 ```
 
-### 4.2 Resume Training
+### 5.2 Resume Training
 ```bash
 python -m lerobot.scripts.lerobot_train \
   --dataset.repo_id=ufactory/xarm7_record_datas \
@@ -184,7 +217,7 @@ python -m lerobot.scripts.lerobot_train \
   --config_path=outputs/train/xarm7_record_datas/checkpoints/last/pretrained_model/train_config.json
 ```
 
-## 5. Inference & Evaluation
+## 6. Inference & Evaluation
 
 ### Run with a Specified Model
 ```bash
@@ -192,7 +225,7 @@ python uf_robot_eval.py --config config/xarm7_gello_record_config.yaml \
   --policy.path=outputs/train/xarm7_record_datas/checkpoints/last/pretrained_model/
 ```
 
-## 6. Dataset Utilities
+## 7. Dataset Utilities
 
 ### Playback an Episode
 Example: view episode index **17**
@@ -222,25 +255,24 @@ aggregate_datasets(
 ```
 
 
-## 7. Important Notes
+## 8. Important Notes
 Users are expected to thoroughly study the codebase and configuration parameters.  
 The provided configurations are **not guaranteed to work for all scenarios** and must be adjusted based on actual hardware setups and task requirements.
 
 In particular, for **diffusion policies**, the default parameters in LeRobot are primarily designed for simulation and **are not optimized for real-world robots**.
 
 
-## 8. Dataset Examples (Reference Only)
+## 9. Dataset Examples (Reference Only)
 [Test datasets](https://drive.google.com/drive/folders/1Ms25rd2YYGdh3tHPEsTTMU-m1fE7uNYY?usp=sharing) used during development (not reusable):
 - **xarm7_act_20260119**: 60 successful single-attempt grasps recorded via gello
 - **xarm7_act_20260127**: 80 samples (added 20 failure-and-retry cases)
 - **xarm7_act_mock_20260126**: 60 one-shot grasps generated programmatically
+- **xarm7_pika_datas_aa_merge_0208_0209_2pi**: 150 samples grasps recorded via pika
 
 > These datasets are **for reference only**.  
-> They cannot be reused because the robot–camera calibration differs between users.
+> They cannot be reused because the robot–camera position differs between users.
 
-* Train using xarm7_act_20260127 for 500,000 iterations.
+* Train using xarm7_act_20260127 for 500,000 training steps.
   [![watch the video](/src/lerobot/ufactory_usage/assets/inference-gello.png)](https://www.youtube.com/watch?v=wTiWLiHciT8)
-* Train xarm7_act_mock_20260126 for 500,000 iterations.
-  --waiting...
-* Failure Cases
-  --waiting...
+* Train xarm7_pika_datas_aa_merge_0208_0209_2pi for 400,000 training steps.
+  [![watch the video](/src/lerobot/ufactory_usage/assets/inference-pika.png)](https://youtu.be/IiyvewZh5OY)

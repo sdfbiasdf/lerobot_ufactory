@@ -3,6 +3,7 @@ import argparse
 import importlib
 import logging
 import time
+import math
 import torch
 from dataclasses import asdict, dataclass
 from pprint import pformat
@@ -178,6 +179,8 @@ def eval(cfg: EvalConfig):
     except RuntimeError:
         print("already running")
 
+    rx_continuous = getattr(cfg.robot, 'rx_continuous', False)
+
     # with torch.no_grad(), torch.autocast(device_type=device.type) if cfg.policy.use_amp else nullcontext():
     while True:
         
@@ -195,6 +198,8 @@ def eval(cfg: EvalConfig):
 
             # Get robot observation
             obs = robot.get_observation()
+            if rx_continuous and 'pose.rx' in obs and obs['pose.rx'] < 0:
+                obs['pose.rx'] += 2 * math.pi
 
             # Applies a pipeline to the raw robot observation, default is IdentityProcessor
             obs_processed = robot_observation_processor(obs)
@@ -213,6 +218,8 @@ def eval(cfg: EvalConfig):
             )
             act_processed_policy = make_robot_action(action_values, dataset_features)
             robot_action_to_send = robot_action_processor((act_processed_policy, obs))
+            if rx_continuous and 'pose.rx' in robot_action_to_send and robot_action_to_send['pose.rx'] > math.pi:
+                robot_action_to_send['pose.rx'] -= 2 * math.pi
             robot.send_action(robot_action_to_send)
         
             dt_s = time.perf_counter() - start_loop_t
