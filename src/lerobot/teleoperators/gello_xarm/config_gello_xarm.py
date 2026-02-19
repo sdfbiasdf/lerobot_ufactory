@@ -10,8 +10,8 @@ from lerobot.teleoperators import TeleoperatorConfig
 @dataclass
 class GelloxArmConfig(TeleoperatorConfig):
     # Port to connect to the gello dummy arm
-    port: str = "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTAJZYC7-if00-port0"
-
+    port: str = "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTATZQHL-if00-port0"
+    
     # Others: Calibration angles, joint directions etc
     joint_ids: Tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7)
     joint_signs: Tuple[int, ...] = (1, 1, 1, 1, 1, 1, 1) # if follow the original open-sourced gello xarm7 setup

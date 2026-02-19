@@ -1,0 +1,35 @@
+
+RobotConfig:
+  _target_: lerobot.robots.ufactory_robot.UFRobotConfig
+  id: "lab-eval"
+  robot_ip: "192.168.0.240"
+  robot_dof: 7
+  control_space: "cartesian"
+  gripper_control: True
+  start_joints: [0, 0, 0, 1.5708, 0, 1.5708, 0]
+  
+  
+  cameras:
+    wrist: 
+      _target_: lerobot.cameras.realsense.configuration_realsense.RealSenseCameraConfig
+      serial_number_or_name: "348522072411"
+      fps: 30
+      width: 640
+      height: 480
+      color_mode: "rgb"
+      use_depth: false
+
+DatasetRecordConfig:
+  _target_: lerobot.scripts.lerobot_record.DatasetRecordConfig
+  repo_id: "xarm7_eval_cartesian_results"
+  root: "outputs/eval/xarm7_test_run"
+  fps: 30
+  single_task: "pick up the box"
+  push_to_hub: False
+  
+Policy:
+  _target_: lerobot.policies.pi05.configuration_pi05.PI05Config
+  pretrained_path: "lerobot/pi05_libero_finetuned"
+  dtype: bfloat16
+  use_amp: true
+

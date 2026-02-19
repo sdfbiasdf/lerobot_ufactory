@@ -139,7 +139,7 @@ def eval(cfg: EvalConfig):
     }
 
     preprocessor, postprocessor = make_pre_post_processors(
-        policy_cfg=cfg.policy,
+        policy_cfgdk=cfg.policy,
         pretrained_path=cfg.policy.pretrained_path,
         preprocessor_overrides=preprocessor_overrides,
         dataset_stats=dataset_metadata.stats
@@ -173,10 +173,14 @@ def eval(cfg: EvalConfig):
     sleep_time_s = 1 / dataset_metadata.fps
 
     print("\n********** Policy Eval Episode Loop Start **********")
+    try:
+        robot.configure()
+    except RuntimeError:
+        print("already running")
 
     # with torch.no_grad(), torch.autocast(device_type=device.type) if cfg.policy.use_amp else nullcontext():
     while True:
-        robot.configure()
+        
         policy.reset()
         preprocessor.reset()
         postprocessor.reset()
@@ -225,7 +229,7 @@ def main():
     parser = argparse.ArgumentParser(description='configuration args')
     parser.add_argument('-c', '--config', type=str, required=True, 
                        help='configuration file path, e.g.my_config.yaml')
-    parser.add_argument('--policy.path', type=str, required=True, 
+    parser.add_argument('--policy.path', type=str, required=False, 
                        help='configuration file path, e.g.my_config.yaml')
     args = parser.parse_args()
     try:
@@ -237,7 +241,7 @@ def main():
         register_third_party_plugins()
         config = instantiate_from_dict(cfg)
 
-        eval_cfg = EvalConfig(robot=config["RobotConfig"], dataset=config["DatasetRecordConfig"])
+        eval_cfg = EvalConfig(robot=config["RobotConfig"], dataset=config["DatasetRecordConfig"],policy=config["Policy"],single_task=config["DatasetRecordConfig"].single_task)
         eval(eval_cfg)
 
 

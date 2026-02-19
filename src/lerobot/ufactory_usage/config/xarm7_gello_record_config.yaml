@@ -1,7 +1,7 @@
 RobotConfig:
   _target_: lerobot.robots.ufactory_robot.UFRobotConfig
   id: "lab"
-  robot_ip: "192.168.1.85"
+  robot_ip: "192.168.0.240"
   robot_dof: 7
   control_space: "joint"
   gripper_control: True
@@ -20,6 +20,6 @@ DatasetRecordConfig:
 # make sure to edit with your correct configurations!
 TeleoperatorConfig:
   _target_: lerobot.teleoperators.gello_xarm.GelloxArmConfig
-  port: "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTAJZYC7-if00-port0"
+  port: "/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FTATZQHL-if00-port0"
   start_joints: [0, 0, 0, 1.5708, 0, 1.5708, 0]
 
